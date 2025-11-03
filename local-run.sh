@@ -1,8 +1,17 @@
 #!/bin/bash
 
-# Check for python-is-python3 installed
-if ! command -v python &>/dev/null; then
-	echo "It appears you do not have python-is-python3 installed"
+# Activate virtual environment if it exists
+if [ -f "venv/bin/activate" ]; then
+	source venv/bin/activate
+fi
+
+# Detect Python command (macOS typically uses python3, Ubuntu uses python)
+if command -v python3 &>/dev/null; then
+	PYTHON_CMD=python3
+elif command -v python &>/dev/null; then
+	PYTHON_CMD=python
+else
+	echo "It appears you do not have python or python3 installed"
 	exit 1
 fi
 
@@ -13,22 +22,22 @@ if ! command -v zola &>/dev/null; then
 fi
 
 # Check for correct slugify package
-PYTHON_ERROR=$(eval "python -c 'from slugify import slugify; print(slugify(\"Test String One\"))'" 2>&1)
+PYTHON_ERROR=$(eval "$PYTHON_CMD -c 'from slugify import slugify; print(slugify(\"Test String One\"))'" 2>&1)
 
 if [[ $PYTHON_ERROR != "test-string-one" ]]; then
 	if [[ $PYTHON_ERROR =~ "NameError" ]]; then
 		echo "It appears you have the wrong version of slugify installed, the required pip package is python-slugify"
 	else
-		echo "It appears you do not have slugify installed. Install it with 'pip install python-slugify'"
+		echo "It appears you do not have slugify installed. Install it with '$PYTHON_CMD -m pip install python-slugify'"
 	fi
 	exit 1
 fi
 
 # Check for rtoml package
-PYTHON_ERROR=$(eval "python -c 'import rtoml'" 2>&1)
+PYTHON_ERROR=$(eval "$PYTHON_CMD -c 'import rtoml'" 2>&1)
 
 if [[ $PYTHON_ERROR =~ "ModuleNotFoundError" ]]; then
-	echo "It appears you do not have rtoml installed. Install it with 'pip install rtoml'"
+	echo "It appears you do not have rtoml installed. Install it with '$PYTHON_CMD -m pip install rtoml'"
 	exit 1
 fi
 
@@ -43,7 +52,7 @@ if [[ -z "${VAULT}" ]]; then
 fi
 
 # Pull environment variables from the vault's netlify.toml when building (by generating env.sh to be sourced)
-python env.py
+$PYTHON_CMD env.py
 
 # Set the site and repo url as local since locally built
 export SITE_URL=local
@@ -56,14 +65,26 @@ rsync -a content/ build/content
 
 # Use obsidian-export to export markdown content from obsidian
 mkdir -p build/content/docs build/__docs
-if [ -z "$STRICT_LINE_BREAKS" ]; then
-	bin/obsidian-export --frontmatter=never --hard-linebreaks --no-recursive-embeds $VAULT build/__docs
+
+# Detect obsidian-export binary (check for macOS version first, fallback to Linux)
+OBSIDIAN_EXPORT=""
+if [ -f "bin/obsidian-export-macos" ]; then
+	OBSIDIAN_EXPORT="bin/obsidian-export-macos"
+elif [ -f "bin/obsidian-export" ]; then
+	OBSIDIAN_EXPORT="bin/obsidian-export"
 else
-	bin/obsidian-export --frontmatter=never --no-recursive-embeds $VAULT build/__docs
+	echo "obsidian-export binary not found. Please download it for your platform."
+	exit 1
+fi
+
+if [ -z "$STRICT_LINE_BREAKS" ]; then
+	$OBSIDIAN_EXPORT --frontmatter=never --hard-linebreaks --no-recursive-embeds "$VAULT" build/__docs
+else
+	$OBSIDIAN_EXPORT --frontmatter=never --no-recursive-embeds "$VAULT" build/__docs
 fi
 
 # Run conversion script
-source env.sh && python convert.py && rm env.sh
+source env.sh && $PYTHON_CMD convert.py && rm env.sh
 
 # Serve Zola site
 zola --root=build serve

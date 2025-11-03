@@ -86,13 +86,34 @@ providers = [
 
 The [example site](https://peteryuen.netlify.app/) shows the capabilities of `obsidian-zola`. Note that the example site uses the `dev` branch of `obsidian-zola`. If you see features that are available in the example site but are not available in the main branch yet, consider trying out the `dev` (unstable) branch. Exact method can be referenced from the [example repo's](https://github.com/ppeetteerrs/obsidian-pkm) `netlify.toml`.
 
-# Local Testing (Ubuntu) [thanks @trwbox]
+# Local Testing
 
-- Install zola from the instuctions on the site `https://www.getzola.org/documentation/getting-started/installation/`
-- Run the following commands to install other needed dependencies `sudo apt install python-is-python3 python3-pip` and `pip3 install python-slugify rtoml` (or use `conda` / `mamba`)
+## macOS
+
+- Install zola from the instructions on the site `https://www.getzola.org/documentation/getting-started/installation/` (or use `brew install zola`)
+- Install Python dependencies:
+  - If using a virtual environment (recommended): `python3 -m venv venv && source venv/bin/activate && pip install python-slugify rtoml`
+  - Or install system-wide: `pip3 install --user python-slugify rtoml`
+- Download the macOS binary for obsidian-export:
+  ```bash
+  cd bin
+  curl -L -o obsidian-export-macos.tar.xz https://github.com/zoni/obsidian-export/releases/latest/download/obsidian-export-aarch64-apple-darwin.tar.xz
+  tar -xf obsidian-export-macos.tar.xz
+  mv obsidian-export obsidian-export-macos
+  rm obsidian-export-macos.tar.xz
+  chmod +x obsidian-export-macos
+  cd ..
+  ```
+- Set the path to the Obsidian vault using a `.vault_path` file (e.g., `echo '/path/to/your/vault' > .vault_path`) or the `$VAULT` environment variable
+- Run `./local-run.sh` to start the local development server
+
+## Ubuntu [thanks @trwbox]
+
+- Install zola from the instructions on the site `https://www.getzola.org/documentation/getting-started/installation/`
+- Run the following commands to install other needed dependencies: `sudo apt install python-is-python3 python3-pip` and `pip3 install python-slugify rtoml` (or use `conda` / `mamba`)
 - Use `git clone https://github.com/ppeetteerrs/obsidian-zola` to clone the repo to somewhere other than inside the Obsidian vault folder
-- Set the path to the Obsisian vault using a `.vault_path` file or the `$VAULT` environment variable
-- use `./local-run.sh` to run the site
+- Set the path to the Obsidian vault using a `.vault_path` file or the `$VAULT` environment variable
+- Use `./local-run.sh` to run the site
 
 # Features 
 

@@ -3,105 +3,143 @@ function isDark() {
 	return localStorage.getItem("theme") === "dark" || (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
 }
 
-// Get URL of current page and also current node
-var curr_url = decodeURI(window.location.href.replace(location.origin, ""));
-if (curr_url.endsWith("/")) {
-	curr_url = curr_url.slice(0, -1);
-}
+// Initialize graph asynchronously after page load
+function initGraph() {
+	// Get graph element
+	var container = document.getElementById("graph");
+	if (!container) {
+		return;
+	}
 
-// Get graph element
-var container = document.getElementById("graph");
+	// Show loading placeholder
+	container.style.minHeight = "400px";
+	container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 400px; color: #666;"><div>Loading graph...</div></div>';
 
-// Parse nodes and edges
-try {
-	var curr_node = graph_data.nodes.filter((node) => decodeURI(node.url) == curr_url);
-} catch (error) {
-	var curr_node = null;
-}
-var nodes = null;
-var edges = new vis.DataSet(graph_data.edges);
+	// Wait for graph_data to be available and page to be interactive
+	function tryInit() {
+		if (typeof graph_data === 'undefined' || typeof vis === 'undefined') {
+			// Retry after a short delay
+			setTimeout(tryInit, 50);
+			return;
+		}
 
-if (curr_node.length > 0) {
-	curr_node = curr_node[0];
-
-	// Get nodes connected to current
-	var connected_nodes = graph_data.edges
-		.filter((edge) => edge.from == curr_node.id || edge.to == curr_node.id)
-		.map((edge) => {
-			if (edge.from == curr_node.id) {
-				return edge.to;
+		// Use requestIdleCallback if available for better performance, otherwise setTimeout
+		var initCallback = window.requestIdleCallback || function(cb) { setTimeout(cb, 200); };
+		
+		initCallback(function() {
+			// Get URL of current page and also current node
+			var curr_url = decodeURI(window.location.href.replace(location.origin, ""));
+			if (curr_url.endsWith("/")) {
+				curr_url = curr_url.slice(0, -1);
 			}
-			return edge.from;
-		});
 
-	if (graph_is_local) {
-		nodes = new vis.DataSet(graph_data.nodes.filter((node) => node.id == curr_node.id || connected_nodes.includes(node.id)));
-	} else {
-		nodes = new vis.DataSet(graph_data.nodes);
-	}
-} else {
-	curr_node = null;
-	nodes = new vis.DataSet(graph_data.nodes);
-}
+			// Parse nodes and edges
+			var curr_node = null;
+			try {
+				var filtered = graph_data.nodes.filter((node) => decodeURI(node.url) == curr_url);
+				if (filtered.length > 0) {
+					curr_node = filtered[0];
+				}
+			} catch (error) {
+				curr_node = null;
+			}
+			
+			var nodes = null;
+			var edges = new vis.DataSet(graph_data.edges);
 
-// Get nodes and edges from generated javascript
-var max_node_val = Math.max(...nodes.map((node) => node.value));
+			if (curr_node) {
+				// Get nodes connected to current
+				var connected_nodes = graph_data.edges
+					.filter((edge) => edge.from == curr_node.id || edge.to == curr_node.id)
+					.map((edge) => {
+						if (edge.from == curr_node.id) {
+							return edge.to;
+						}
+						return edge.from;
+					});
 
-// Highlight current node and set to center
-if (curr_node) {
-	nodes.update({
-		id: curr_node.id,
-		value: Math.max(4, max_node_val * 2.5),
-		shape: "star",
-		color: "#a6a7ed",
-		font: {
-			strokeWidth: 1,
-		},
-		x: 0,
-		y: 0,
-	});
-}
+				if (graph_is_local) {
+					nodes = new vis.DataSet(graph_data.nodes.filter((node) => node.id == curr_node.id || connected_nodes.includes(node.id)));
+				} else {
+					nodes = new vis.DataSet(graph_data.nodes);
+				}
+			} else {
+				curr_node = null;
+				nodes = new vis.DataSet(graph_data.nodes);
+			}
 
-// Construct graph
-var options = ___GRAPH_OPTIONS___;
+			// Get nodes and edges from generated javascript
+			var max_node_val = Math.max(...nodes.map((node) => node.value));
 
-var graph = new vis.Network(
-	container,
-	{
-		nodes: nodes,
-		edges: edges,
-	},
-	options
-);
+			// Highlight current node and set to center
+			if (curr_node) {
+				nodes.update({
+					id: curr_node.id,
+					value: Math.max(4, max_node_val * 2.5),
+					shape: "star",
+					color: "#a6a7ed",
+					font: {
+						strokeWidth: 1,
+					},
+					x: 0,
+					y: 0,
+				});
+			}
 
-// Clickable URL
-graph.on("selectNode", function (params) {
-	if (params.nodes.length === 1) {
-		var node = nodes.get(params.nodes[0]);
-		if (graph_link_replace) {
-			window.open(node.url, "_self");
-		} else {
-			window.open(node.url, "_blank");
-		}
-	}
-});
+			// Construct graph
+			var options = ___GRAPH_OPTIONS___;
 
-// Focus on current node + scaling
-graph.once("afterDrawing", function () {
-	if (curr_node) {
-		if (!graph_is_local) {
-			graph.focus(curr_node.id, {
-				scale: graph.getScale() * 1.8,
+			var graph = new vis.Network(
+				container,
+				{
+					nodes: nodes,
+					edges: edges,
+				},
+				options
+			);
+
+			// Clickable URL
+			graph.on("selectNode", function (params) {
+				if (params.nodes.length === 1) {
+					var node = nodes.get(params.nodes[0]);
+					if (graph_link_replace) {
+						window.open(node.url, "_self");
+					} else {
+						window.open(node.url, "_blank");
+					}
+				}
 			});
-		}
-	} else {
-		var clientHeight = container.clientHeight;
-		graph.moveTo({
-			position: {
-				x: 0,
-				y: -clientHeight / 3,
-			},
-			scale: graph.getScale() * 1.2,
+
+			// Focus on current node + scaling
+			graph.once("afterDrawing", function () {
+				if (curr_node) {
+					if (!graph_is_local) {
+						graph.focus(curr_node.id, {
+							scale: graph.getScale() * 1.8,
+						});
+					}
+				} else {
+					var clientHeight = container.clientHeight;
+					graph.moveTo({
+						position: {
+							x: 0,
+							y: -clientHeight / 3,
+						},
+						scale: graph.getScale() * 1.2,
+					});
+				}
+			});
 		});
 	}
-});
+
+	// Start trying to initialize
+	tryInit();
+}
+
+// Initialize graph after DOM is ready
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', initGraph);
+} else {
+	// DOM already loaded, wait a bit for other scripts
+	setTimeout(initGraph, 50);
+}
