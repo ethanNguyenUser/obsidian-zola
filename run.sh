@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -u
+set -o pipefail
+
 pip install python-slugify
 
 # Avoid copying over netlify.toml (will ebe exposed to public API)
@@ -42,11 +45,42 @@ if [ ! -x "__site/bin/obsidian-export" ]; then
     chmod +x "__site/bin/obsidian-export"
     rm -rf "$TMPDIR"
 fi
-if [ -z "$STRICT_LINE_BREAKS" ]; then
-	__site/bin/obsidian-export --frontmatter=never --hard-linebreaks --no-recursive-embeds __obsidian __site/build/__docs
+
+# Diagnostics: count markdown files in source vault
+echo "Counting Markdown files in source vault (__obsidian)..."
+SRC_MD_COUNT=$(find __obsidian -type f -name "*.md" | wc -l | tr -d ' ')
+echo "Source Markdown files: ${SRC_MD_COUNT}"
+
+echo "Running obsidian-export..."
+EXPORT_LOG="__site/build/obsidian-export.log"
+if [ -z "${STRICT_LINE_BREAKS:-}" ]; then
+    set +e
+    __site/bin/obsidian-export \
+        --frontmatter=never \
+        --hard-linebreaks \
+        --no-recursive-embeds \
+        __obsidian __site/build/__docs | tee "$EXPORT_LOG"
+    EXPORT_EXIT=$?
+    set -e
 else
-	__site/bin/obsidian-export --frontmatter=never --no-recursive-embeds __obsidian __site/build/__docs
+    set +e
+    __site/bin/obsidian-export \
+        --frontmatter=never \
+        --no-recursive-embeds \
+        __obsidian __site/build/__docs | tee "$EXPORT_LOG"
+    EXPORT_EXIT=$?
+    set -e
 fi
+
+if [ "$EXPORT_EXIT" -ne 0 ]; then
+    echo "WARNING: obsidian-export exited with code ${EXPORT_EXIT}. Continuing build with partially exported notes." >&2
+    echo "See export log at ${EXPORT_LOG} for details." >&2
+fi
+
+# Diagnostics: count exported markdown files
+echo "Counting exported Markdown files (__site/build/__docs)..."
+EXP_MD_COUNT=$(find __site/build/__docs -type f -name "*.md" | wc -l | tr -d ' ')
+echo "Exported Markdown files: ${EXP_MD_COUNT}"
 
 # Run conversion script
 python __site/convert.py
