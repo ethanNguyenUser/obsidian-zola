@@ -54,7 +54,13 @@ fi
 # Pull environment variables from the vault's netlify.toml when building (by generating env.sh to be sourced)
 $PYTHON_CMD env.py
 
-# Set the site and repo url as local since locally built
+# Source env.sh if it exists and has content, then override with local values
+# This ensures local testing doesn't interfere with deployment settings
+if [ -f "env.sh" ] && [ -s "env.sh" ]; then
+	source env.sh
+fi
+
+# Set the site and repo url as local since locally built (override any values from netlify.toml)
 export SITE_URL=local
 export REPO_URL=local
 
@@ -83,8 +89,11 @@ else
 	$OBSIDIAN_EXPORT --frontmatter=never --no-recursive-embeds "$VAULT" build/__docs
 fi
 
-# Run conversion script
-source env.sh && $PYTHON_CMD convert.py && rm env.sh
+# Run conversion script (env.sh already sourced above, but ensure it's cleaned up)
+$PYTHON_CMD convert.py
+if [ -f "env.sh" ]; then
+	rm env.sh
+fi
 
 # Serve Zola site
 zola --root=build serve
