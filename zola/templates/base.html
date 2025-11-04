@@ -37,6 +37,17 @@
     if (localStorage.getItem("theme") === "dark" || (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
       document.body.classList.add("dark");
     }
+    // Case-insensitive URL handling for /docs/ paths
+    // When SLUGIFY is enabled, all URLs are lowercase, but users might type capitalized URLs
+    (function() {
+      const currentPath = window.location.pathname;
+      // Only handle /docs/ paths and if they contain uppercase letters
+      if (currentPath.startsWith('/docs/') && currentPath !== currentPath.toLowerCase()) {
+        const lowerPath = currentPath.toLowerCase();
+        // Redirect to lowercase version immediately to avoid 404
+        window.location.replace(lowerPath + window.location.search + window.location.hash);
+      }
+    })();
   </script>
   {% block header %}
     {{ macros_header::header(current_section="/") }}

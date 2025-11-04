@@ -29,8 +29,10 @@ pp = PrettyPrinter(indent=4, compact=False).pprint
 def slugify_path(path: Union[str, Path], no_suffix: bool) -> Path:
     """Slugifies every component of a path. Note that '../xxx' will get slugified to '/xxx'. Always use absolute paths. `no_suffix=True` when path is URL or directory (slugify everything including extension)."""
 
-    path = Path(str(path).lower())
+    path = Path(path)
     if Settings.is_true("SLUGIFY"):
+        # Lowercase path when slugifying for consistency
+        path = Path(str(path).lower())
         if no_suffix:
             os_path = "/".join(slugify(item) for item in path.parts)
             name = ""
@@ -47,6 +49,7 @@ def slugify_path(path: Union[str, Path], no_suffix: bool) -> Path:
         else:
             return Path(os_path)
     else:
+        # When SLUGIFY is off, preserve original case
         return path
 
 
